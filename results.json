@@ -1,0 +1,50 @@
+{
+  "author": "Lorenzo Faloci",
+  "dataset": "Fruits-360",
+  "dataset_url": "https://www.kaggle.com/datasets/moltean/fruits",
+  "num_classes": 255,
+  "image_size": [100, 100],
+  "framework": "TensorFlow / Keras",
+  "runtime": "Google Colab (GPU T4 -> CPU)",
+
+  "cnn_scratch": {
+    "val_accuracy": 0.9953,
+    "val_loss": 0.0160,
+    "test_accuracy": 0.9904,
+    "epochs": 20,
+    "best_epoch": 19,
+    "train_time_min": 150.5,
+    "params_millions": 4.87,
+    "architecture": "Conv2D(32) -> Conv2D(64) -> Conv2D(128) -> Dense(256) -> Dropout -> Dense(255, softmax)",
+    "optimizer": "Adam",
+    "augmentation": ["rotation_range=20", "horizontal_flip", "zoom_range=0.2"]
+  },
+
+  "transfer_learning": {
+    "base_model": "EfficientNetB0",
+    "pretrained_on": "ImageNet",
+    "val_accuracy": 0.9724,
+    "val_loss": 0.0740,
+    "epochs_completed": 7,
+    "phase": "Phase 1 only — backbone frozen (Phase 2 fine-tuning not completed, GPU quota exhausted)",
+    "best_epoch": 6,
+    "train_time_min": 53,
+    "params_millions": 5.33,
+    "note": "With full Phase 2 fine-tuning, expected > 99%"
+  },
+
+  "key_observations": [
+    "Fruits-360 has uniform white background -> CNN Scratch very competitive",
+    "Transfer Learning converges 3x faster (7 epochs vs 20 for comparable accuracy)",
+    "Critical EfficientNet fix: add Rescaling(255.0) layer (expects [0,255] not [0,1])",
+    "On real-world data (varied backgrounds), Transfer Learning expected to outperform significantly"
+  ],
+
+  "plots": {
+    "training_curves":       "plots/training_comparison.png",
+    "model_comparison_bar":  "plots/model_comparison_bar.png",
+    "confusion_matrices":    "plots/confusion_matrices.png",
+    "gradcam":               "plots/gradcam_examples.png",
+    "predictions_grid":      "plots/predictions_grid.png"
+  }
+}

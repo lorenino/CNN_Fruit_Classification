@@ -1,0 +1,144 @@
+{
+  "author": "Lorenzo Faloci",
+  "date": "2026-03-26",
+  "course": "Deep Learning — Classification d'images par CNN",
+
+  "dataset": {
+    "name": "Fruits-360",
+    "url": "https://www.kaggle.com/datasets/moltean/fruits",
+    "paper": "Muresan & Oltean 2018 — https://arxiv.org/abs/1810.10029",
+    "num_classes": 255,
+    "total_images": 90483,
+    "image_size": [100, 100, 3],
+    "background": "Fond blanc uniforme (studio)",
+    "split": {
+      "train": "~67 000 images",
+      "validation": "~17 000 images",
+      "test": "~6 000 images"
+    }
+  },
+
+  "preprocessing": {
+    "resize": [100, 100],
+    "normalization": "rescale=1/255 (ImageDataGenerator)",
+    "augmentation": {
+      "rotation_range": 20,
+      "width_shift_range": 0.1,
+      "height_shift_range": 0.1,
+      "horizontal_flip": true,
+      "zoom_range": 0.15
+    },
+    "decision_rationale": "Augmentation légère car Fruits-360 a déjà peu de variabilité (fond blanc, angles limités). Une augmentation trop forte dégraderait les performances."
+  },
+
+  "model_1_cnn_scratch": {
+    "val_accuracy": 0.9953,
+    "val_loss": 0.0160,
+    "test_accuracy": 0.9904,
+    "epochs": 20,
+    "best_epoch": 19,
+    "train_time_min": 150.5,
+    "params_millions": 4.87,
+    "runtime": "Google Colab GPU T4",
+
+    "architecture": {
+      "layers": [
+        "Input(100x100x3)",
+        "Conv2D(32, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(64, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(128, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Flatten",
+        "Dense(256) + ReLU",
+        "Dropout(0.5)",
+        "Dense(255, softmax)"
+      ],
+      "why_3_conv_blocks": "3 blocs suffisent pour des images 100x100 — au-delà, le feature map devient trop petit et on gagne peu en représentation.",
+      "why_32_64_128": "Progression classique en puissances de 2 — chaque couche détecte des features de plus en plus abstraites (bords → textures → formes).",
+      "why_dropout_0.5": "Prévient l'overfitting sur le set train tout en laissant le modèle apprendre — 0.5 est un bon point de départ pour le fully-connected.",
+      "why_batchnorm": "Stabilise l'entraînement, permet un learning rate plus élevé, accélère la convergence."
+    },
+
+    "training": {
+      "optimizer": "Adam",
+      "learning_rate": 0.001,
+      "loss": "categorical_crossentropy",
+      "batch_size": 64,
+      "callbacks": ["EarlyStopping(patience=5, restore_best_weights=True)", "ReduceLROnPlateau(factor=0.5, patience=3)"],
+      "why_adam": "Adaptatif, robuste aux hyperparamètres, référence standard pour les CNN.",
+      "why_early_stopping": "Évite l'overfitting et arrête l'entraînement quand la val_loss ne s'améliore plus."
+    },
+
+    "results_analysis": {
+      "best_val_accuracy": "99.53% (epoch 19)",
+      "convergence": "Convergence rapide dès l'epoch 3-4 (~93%), puis amélioration progressive",
+      "overfitting": "Faible — train et val accuracy restent proches grâce au Dropout + BN",
+      "conclusion": "CNN simple très compétitif sur ce dataset grâce au fond blanc uniforme qui simplifie la tâche."
+    }
+  },
+
+  "model_2_transfer_learning": {
+    "base_model": "EfficientNetB0",
+    "pretrained_on": "ImageNet (1000 classes, 1.2M images)",
+    "val_accuracy": 0.9724,
+    "val_loss": 0.0740,
+    "epochs_completed": 7,
+    "epochs_planned": 10,
+    "phase": "Phase 1 seulement (backbone gelé)",
+    "best_epoch": 6,
+    "train_time_min": 53,
+    "params_millions": 5.33,
+    "runtime": "Google Colab CPU (quota GPU épuisé après CNN Scratch)",
+
+    "architecture": {
+      "layers": [
+        "Input(100x100x3)",
+        "Rescaling(255.0)  ← FIX CRUCIAL",
+        "EfficientNetB0 (backbone gelé en Phase 1)",
+        "GlobalAveragePooling2D",
+        "Dropout(0.3)",
+        "Dense(255, softmax)"
+      ],
+      "why_efficientnetb0": "Le plus léger de la famille EfficientNet (5.3M params) — bon compromis précision/vitesse pour un projet de cours.",
+      "why_rescaling_255": "EfficientNet attend des inputs en [0,255] mais ImageDataGenerator normalise en [0,1]. Sans ce layer, le modèle recevait des features incorrectes → accuracy bloquée à ~0.7% (random). Fix découvert à l'epoch 1.",
+      "why_freeze_backbone": "Phase 1 (backbone gelé) : seule la tête est entraînée. Permet d'apprendre rapidement la classification fruit sans perturber les features ImageNet. Phase 2 (unfreeze partiel) non effectuée — quota GPU épuisé."
+    },
+
+    "training_phases": {
+      "phase_1": {
+        "epochs": "7/10 (interrompu — quota GPU)",
+        "backbone": "gelé (non entraînable)",
+        "optimizer": "Adam(lr=0.001)",
+        "val_accuracy_reached": "97.24%"
+      },
+      "phase_2_planned": {
+        "status": "NON EFFECTUÉE",
+        "reason": "Quota GPU Google Colab épuisé, switchover vers CPU trop lent",
+        "backbone": "dégel partiel (derniers 30% des couches)",
+        "optimizer_planned": "Adam(lr=0.0001) — LR réduit pour ne pas écraser les features ImageNet",
+        "expected_accuracy": "> 99%"
+      }
+    },
+
+    "results_analysis": {
+      "convergence": "Très rapide — 97%+ dès l'epoch 1 grâce aux features ImageNet",
+      "vs_scratch": "Légèrement inférieur au CNN Scratch (97.24% vs 99.53%) à cause de la Phase 2 manquante",
+      "efficiency": "3x moins de temps d'entraînement pour un résultat comparable",
+      "conclusion": "Avec Phase 2 complète, TL attendu > 99%. Sur dataset réel (fond non uniforme), TL serait nettement supérieur."
+    }
+  },
+
+  "comparison": {
+    "scratch_wins_because": "Fruits-360 est un dataset 'facile' (fond blanc, images studio) — pas besoin de features complexes",
+    "tl_wins_in_practice": "Sur des vraies photos de fruits (supermarché, jardin), le TL généralise mieux",
+    "key_lesson": "Le Transfer Learning n'est pas toujours meilleur — ça dépend du dataset. Sur données simples, CNN scratch suffit. Sur données complexes/peu nombreuses, TL est indispensable.",
+    "speed_advantage": "TL converge 3x plus vite — avantage décisif en production quand le temps/GPU coûte cher"
+  },
+
+  "plots": {
+    "training_comparison.png": "Courbes loss et accuracy (train vs val) pour les 2 modèles sur toutes les epochs",
+    "model_comparison_bar.png": "Bar chart comparant val accuracy / temps d'entraînement / nb de paramètres",
+    "confusion_matrices.png": "Matrices de confusion normalisées sur 30 classes représentatives (simulation basée sur ~99% et ~97% accuracy)",
+    "gradcam_examples.png": "Visualisation GradCAM — zones activées par le CNN pour reconnaître chaque fruit (simulation conceptuelle)",
+    "predictions_grid.png": "Grille de prédictions CNN Scratch vs TL sur 12 exemples avec scores de confiance"
+  }
+}
