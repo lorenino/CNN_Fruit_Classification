@@ -1,6 +1,7 @@
 {
   "author": "Julian",
   "dataset": "Fruits-360 (100x100)",
+  "task": "Classification",
   "num_classes": 199,
   "models": {
     "cnn_from_scratch_5classes": {
@@ -103,14 +104,14 @@
   },
   "key_observations": [
     "100% accuracy sur 5 et 10 classes dès l'epoch 2 — Fruits-360 est trop simple (fond blanc, cadrage parfait) pour évaluer quoi que ce soit sur peu de classes.",
-    "Augmenter à 199 classes crée de vraies confusions inter-classes : le modèle atteint 96.75% val acc et 97.5% sur l'échantillon test — résultat excellent pour un CNN from scratch.",
-    "Toutes les erreurs sont logiquement cohérentes : Pepper Orange vs Pepper Yellow, Cantaloupe 2 vs 3, Granny Smith vs Golden. Jamais de confusion absurde (banane/champignon).",
-    "La confusion Pepper Orange 2 ↔ Pepper Yellow 1 est symétrique et à haute confiance — c'est une limite du dataset, pas du modèle : la frontière orange/jaune est subjective.",
-    "Potato Sweet 1 échoue systématiquement (2/2) → classe à problème dans le dataset, probablement peu représentative ou trop similaire à Cherimoya.",
-    "L'ajout du 4ème bloc conv (128→256) est nécessaire pour discriminer les variantes fines (Cherry 1-5, Pear 1/Abate/Forelle/Kaiser...). Sans lui l'accuracy sur 199 classes aurait plafonné plus tôt.",
-    "Le scheduler StepLR(step=5, gamma=0.5) est crucial : la val acc continue d'augmenter de 87% à 97% tout au long des 30 epochs. Couper à 15 epochs aurait laissé ~1.5% d'accuracy sur la table.",
-    "Overfitting modéré visible : train loss → 0.03, val loss stagne à 0.17. Le Dropout (0.25 conv + 0.5 FC) contient l'écart mais ne l'annule pas. Data augmentation plus agressive aiderait.",
-    "34 minutes d'entraînement sur Apple MPS pour 99 659 images et 199 classes — raisonnable pour du from scratch. Transfer learning (ResNet50) ferait mieux en 5 epochs.",
-    "Paramètres réels (1.64M) inférieurs à l'estimation initiale (~3.2M) car le 4ème bloc MaxPool réduit les feature maps à 2×2 avant le Flatten, limitant la taille de l'entrée du FC."
+    "Augmenter à 199 classes crée de vraies confusions inter-classes : le modèle atteint 96.75% val acc et 97.5% sur l'échantillon test — excellent pour un CNN from scratch.",
+    "Toutes les erreurs sont logiquement cohérentes : jamais de confusion absurde (banane/champignon), uniquement des variantes visuellement proches.",
+    "La confusion Pepper Orange 2 ↔ Pepper Yellow 1 est symétrique et à haute confiance — limite du dataset, pas du modèle.",
+    "Potato Sweet 1 échoue systématiquement (2/2) → classe problématique dans le dataset.",
+    "Le 4ème bloc conv (128→256) est nécessaire pour discriminer les variantes fines (Cherry 1-5, Pear Abate/Forelle/Kaiser...).",
+    "Le scheduler StepLR(step=5, gamma=0.5) est crucial : la val acc progresse de 87% à 97% sur 30 epochs.",
+    "Overfitting modéré : train loss → 0.03, val loss stagne à 0.17. Dropout contient l'écart mais ne l'annule pas.",
+    "34 minutes sur Apple MPS pour 99 659 images et 199 classes — raisonnable pour du from scratch.",
+    "Paramètres réels (1.64M) inférieurs à l'estimation car le 4ème MaxPool réduit les feature maps à 2×2 avant le Flatten."
   ]
 }

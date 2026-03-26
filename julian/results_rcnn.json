@@ -1,0 +1,50 @@
+{
+  "author": "Julian",
+  "dataset": "Pascal VOC Fruit Detection (orange, apple, banana)",
+  "task": "Object Detection",
+  "num_classes": 3,
+  "models": {
+    "faster_rcnn_mobilenetv3": {
+      "architecture": "Faster R-CNN + MobileNetV3 Large 320 FPN",
+      "pretrained_on": "COCO (80 classes)",
+      "strategy": "Transfer Learning — backbone + RPN pré-entraînés, tête de classification remplacée (FastRCNNPredictor)",
+      "val_accuracy": null,
+      "val_loss": 0.21,
+      "train_loss_initial": 2.01,
+      "train_loss_final": 0.18,
+      "loss_breakdown_epoch1": {
+        "loss_classifier": 1.6037,
+        "loss_box_reg": 0.3714,
+        "loss_objectness": 0.0032,
+        "loss_rpn_box_reg": 0.0095
+      },
+      "epochs": 5,
+      "batch_size": 4,
+      "optimizer": "SGD",
+      "learning_rate": 0.005,
+      "momentum": 0.9,
+      "weight_decay": 0.0005,
+      "input_size": 224,
+      "device": "CPU",
+      "train_time_min": 2.5,
+      "params_millions": 18.94,
+      "model_size_mb": 73,
+      "inference": {
+        "conf_threshold": 0.4,
+        "nms_iou_threshold": 0.3
+      }
+    }
+  },
+  "key_observations": [
+    "Faster R-CNN = backbone + RPN + RoI Pooling + tête de classification. On ne réentraîne que la tête.",
+    "MPS (Apple Silicon) ne supporte pas toutes les ops de Faster R-CNN → fallback silencieux CPU causait 528s/epoch. On force DEVICE=cpu directement (~25s/epoch).",
+    "MobileNetV3 choisi à la place de ResNet50 : plus léger, fonctionne bien sur CPU, résultats comparables sur 3 classes simples.",
+    "SGD (lr=0.005, momentum=0.9) préféré à Adam : les gradients du RPN et de la tête ont des magnitudes très différentes, SGD est plus stable.",
+    "La loss est une somme de 4 composantes : classifier, box_reg, objectness, rpn_box_reg. loss_classifier élevée au départ (1.6) est normale : la tête repart aléatoirement.",
+    "val_accuracy null : la métrique standard pour la détection est le mAP (mean Average Precision), pas l'accuracy. On a tracé la val_loss à la place.",
+    "5 epochs suffisent pour du fine-tuning sur 3 classes : le backbone sait déjà extraire des features visuelles (COCO).",
+    "Format annotations : Pascal VOC XML (bndbox xmin/ymin/xmax/ymax). Coordonnées renormalisées à 224×224 au chargement.",
+    "model.train() + torch.no_grad() pour la val_loss : Faster R-CNN ne renvoie les losses qu'en mode train(), pas en eval().",
+    "Détecte plusieurs fruits par image avec des boîtes localisées — contrairement au classifieur ResNet50 qui prédit une seule classe par image."
+  ]
+}
