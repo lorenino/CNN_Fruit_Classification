@@ -1,0 +1,4 @@
+nicolas/data/*
+nicolas/dataset/
+nicolas/bad/
+.venv

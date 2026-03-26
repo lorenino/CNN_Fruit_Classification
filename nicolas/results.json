@@ -1,0 +1,135 @@
+{
+  "author": "Nicolas Guilland",
+  "date": "2026-03-26",
+  "course": "Deep Learning — Classification d'images par CNN",
+
+  "dataset": {
+    "name": "Fruits and Vegetables Image Recognition Dataset",
+    "source": "Kaggle",
+    "num_classes": 35,
+    "total_images": 3024,
+    "image_size": [128, 128, 3],
+    "background": "Fond réel (photos de supermarché, jardin, cuisine) — contraste fort avec le dataset Fruits-360",
+    "classes": [
+      "apple", "banana", "beetroot", "cabbage", "capsicum", "carrot",
+      "cauliflower", "chilli pepper", "corn", "cucumber", "eggplant",
+      "garlic", "ginger", "grapes", "jalepeno", "kiwi", "lemon",
+      "lettuce", "mango", "onion", "orange", "paprika", "pear", "peas",
+      "pineapple", "pomegranate", "potato", "raddish", "soy beans",
+      "spinach", "sweetcorn", "sweetpotato", "tomato", "turnip", "watermelon"
+    ],
+    "split": {
+      "strategy": "Découpage manuel stratifié (random_state=42) depuis le dossier train/ du dataset Kaggle",
+      "train": "2116 images (70%)",
+      "validation": "454 images (15%)",
+      "test": "454 images (15%)",
+      "data_leak_check": "Vérifié — aucune image partagée entre les 3 splits"
+    },
+    "note": "Le dataset Kaggle était déjà scindé en train/validation/test, mais nous avons découvert que les images de validation étaient en réalité présentes dans le dossier train (fuite de données). Nous avons donc reconstruit les splits manuellement depuis le dossier train/ uniquement."
+  },
+
+  "preprocessing": {
+    "resize": [128, 128],
+    "normalization": "rescale=1/255 (ImageDataGenerator)",
+    "augmentation": {
+      "rotation_range": 25,
+      "width_shift_range": 0.15,
+      "height_shift_range": 0.15,
+      "shear_range": 0.15,
+      "zoom_range": 0.2,
+      "horizontal_flip": true,
+      "brightness_range": [0.8, 1.2],
+      "fill_mode": "nearest"
+    },
+    "decision_rationale": "Augmentation plus forte que sur Fruits-360 car le dataset contient des photos réelles avec fond : la variabilité naturelle (luminosité, angles, recadrage) est plus élevée. La brightness_range compense les variations d'éclairage."
+  },
+
+  "model_cnn_scratch": {
+    "val_accuracy": 0.8969,
+    "val_loss": 0.3786,
+    "test_accuracy": 0.9026,
+    "test_loss": 0.3576,
+    "epochs_completed": 85,
+    "best_epoch": 70,
+    "params_millions": 0.638,
+    "runtime": "MacBook M3 Pro (CPU — TensorFlow Metal, GPU non détecté)",
+
+    "architecture": {
+      "layers": [
+        "Input(128x128x3)",
+        "Conv2D(128, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(128, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(64, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(128, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Conv2D(32, 3x3, padding=same) + BatchNorm + ReLU + MaxPool(2x2)",
+        "Flatten",
+        "Dense(512) + BatchNorm + ReLU",
+        "Dense(64) + BatchNorm + ReLU",
+        "Dropout(0.3)",
+        "Dense(35, softmax)"
+      ],
+      "total_params": 637699,
+      "why_5_conv_blocks": "5 blocs pour des images 128x128 avec fond réel — plus de blocs nécessaires pour abstraire les features complexes (textures, contexte). Feature map final : 4x4x32.",
+      "why_128_128_64_128_32": "Filtres non monotones : le passage 128→64→128 permet une compression puis ré-expansion des features pour capturer des patterns à différentes échelles.",
+      "why_dropout_0.3": "Dropout uniquement en tête (pas dans les blocs conv) pour éviter de perturber l'extraction de features. 0.3 plus conservateur que 0.5 car le dataset est petit (2116 images train).",
+      "why_batchnorm_everywhere": "Normalisation après chaque couche Dense en plus des couches conv — stabilise l'entraînement sur un dataset de petite taille avec forte augmentation."
+    },
+
+    "training": {
+      "optimizer": "Adam",
+      "learning_rate_initial": 0.001,
+      "loss": "categorical_crossentropy",
+      "batch_size": 32,
+      "max_epochs": 100,
+      "callbacks": [
+        "EarlyStopping(monitor=val_accuracy, patience=15, restore_best_weights=True)",
+        "ReduceLROnPlateau(monitor=val_accuracy, factor=0.5, patience=5, min_lr=1e-6)",
+        "ModelCheckpoint(save_best_only=True, monitor=val_accuracy)"
+      ],
+      "lr_reduction_history": [
+        {"epoch": 20, "old_lr": 0.001,    "new_lr": 0.0005},
+        {"epoch": 50, "old_lr": 0.0005,   "new_lr": 0.00025},
+        {"epoch": 62, "old_lr": 0.00025,  "new_lr": 0.000125},
+        {"epoch": 75, "old_lr": 0.000125, "new_lr": 0.0000625},
+        {"epoch": 80, "old_lr": 0.0000625,"new_lr": 0.00003125},
+        {"epoch": 85, "old_lr": 0.00003125,"new_lr": 0.000015625}
+      ],
+      "why_adam": "Adaptatif, robuste, référence standard pour CNN.",
+      "why_early_stopping_patience_15": "Patience élevée (15) pour laisser le modèle traverser les plateaux — le ReduceLROnPlateau réduit le LR avant que l'EarlyStopping ne coupe.",
+      "why_reducelr_patience_5": "Réduit le LR tous les 5 epochs sans amélioration, permettant une descente de gradient plus fine sur les plateaux."
+    },
+
+    "results_analysis": {
+      "best_val_accuracy": "89.69% (epoch 70)",
+      "test_accuracy": "90.26% — légèrement supérieur à val_accuracy, signe d'absence d'overfitting sur le split de validation",
+      "convergence": "Lente — val_accuracy < 10% aux epochs 1-6, accélération à partir de l'epoch 9 (~36%), convergence effective vers epoch 55-70",
+      "overfitting": "Faible — val_accuracy (89.7%) proche de train_accuracy finale (~72% batch-level), écart dû à l'augmentation forte sur train",
+      "conclusion": "Bonnes performances (~90%) malgré un dataset avec fond réel et seulement 3024 images. L'architecture 5 blocs + BN + ReduceLROnPlateau progressif a été déterminante."
+    }
+  },
+
+  "failed_attempts": {
+    "attempt_1_cat_dog_architecture": {
+      "description": "Architecture identique au modèle chat/chien avec uniquement la dernière couche modifiée (2→35 sorties)",
+      "result": "Résultats insuffisants après 50 epochs — modèle trop simple pour 35 classes sur images réelles",
+      "lesson": "Adapter l'architecture complète au nouveau problème, pas seulement la couche de sortie."
+    },
+    "attempt_2_val_accuracy_stagnation": {
+      "description": "Architectures diverses (V2, V3, V4) avec RMSprop et ReduceLROnPlateau trop agressif (patience=2, min_lr=1e-4)",
+      "result": "val_accuracy bloquée à 4-14% malgré une train_accuracy qui montait jusqu'à 88%",
+      "lesson": "ReduceLROnPlateau trop agressif (patience=2) coupe l'apprentissage trop tôt. Le modèle mémorisait sans généraliser."
+    },
+    "attempt_3_data_leakage": {
+      "description": "Utilisation des splits train/validation/test fournis par Kaggle sans vérification",
+      "result": "Très bonnes métriques en accuracy et val_accuracy, mais prédictions catastrophiques sur de nouvelles images (ex: pomme → épinards 78%)",
+      "lesson": "Les images de validation du dataset Kaggle étaient déjà présentes dans le dossier train. Le modèle se validait sur des images qu'il avait déjà vues. Solution : reconstruire les splits manuellement avec vérification d'absence de doublons."
+    }
+  },
+
+  "comparison_with_lorenzo": {
+    "dataset_difficulty": "Dataset Nicolas plus difficile : fond réel vs fond blanc uniforme (Lorenzo). Moins d'images (3024 vs 90483). Plus de variabilité intra-classe.",
+    "accuracy_gap": "90.26% (Nicolas) vs 99.04% (Lorenzo) — écart expliqué par la complexité du dataset, pas par l'architecture",
+    "key_lesson": "La qualité et la représentativité du dataset impactent les performances plus que l'architecture seule. Sur données réelles, ~90% avec 3024 images est un bon résultat.",
+    "generalization": "Le modèle de Nicolas devrait mieux généraliser sur de vraies photos 'du quotidien' que celui de Lorenzo entraîné uniquement sur fond blanc studio."
+  }
+}
